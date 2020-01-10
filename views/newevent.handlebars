@@ -32,7 +32,23 @@
 	<div class="alert alert-danger" role="alert">{{this.msg}}</div>
 {{/each}}
 
-<div class="container mb-4">
+{{#if oauth}}
+	<div class="container mb-4" id="oauth-login" style="display:none">
+    <div class="row">
+      <p>This server requires you to log in to your account on <a href="https://{{oauth.domain}}">{{oauth.domain}}</a> in order to create events or an event group.</p>
+      <div class="col-sm-4 p-2">
+        <button type="button" id="oauthLoginButton" class="btn btn-lg btn-secondary w-100"><i class="fas"></i> Log in  </button>
+      </div>
+    </div>
+	</div>
+
+	<div class="container mb-4" id="login-confirmed" style="display:none">
+    <div class="row">
+      <p>loading...</p>
+    </div>
+	</div>
+
+<div class="container mb-4" id="action-buttons" style="display:none">
   <div class="row">
     <div class="col-sm-4 p-2">
       <button type="button" id="showNewEventFormButton" class="btn btn-lg btn-secondary w-100"><i class="fas fa-file"></i> Create a new event</button>
@@ -64,6 +80,40 @@
 <div id="newEventGroupFormContainer">
   {{>neweventgroupform}}
 </div>
+{{else}}
+<div class="container mb-4">
+  <div class="row">
+    <div class="col-sm-4 p-2">
+      <button type="button" id="showNewEventFormButton" class="btn btn-lg btn-secondary w-100"><i class="fas fa-file"></i> Create a new event</button>
+    </div>
+    <div class="col-sm-4 p-2">
+      <button type="button" id="showImportEventFormButton" class="btn btn-lg btn-secondary w-100"><i class="fas fa-file-import"></i> Import an existing event</button>
+    </div>
+    <div class="col-sm-4 p-2">
+      <button type="button" id="showNewEventGroupFormButton" class="btn btn-lg btn-secondary w-100"><i class="fas fa-folder-open"></i> Create a new event group </button>
+    </div>
+  </div>
+</div>
+
+<div id="newEventFormContainer">
+  {{#if isPublic}}
+    {{>neweventform}}
+  {{else if isPrivate}}
+    {{>neweventform}}
+  {{else if isOrganisation}}
+    {{>neweventform}}
+  {{else}}
+  {{/if}}
+</div>
+
+<div id="importEventFormContainer">
+  {{>importeventform}}
+</div>
+
+<div id="newEventGroupFormContainer">
+  {{>neweventgroupform}}
+</div>
+{{/if}}
 
 	<script>
   $.validate({
@@ -73,7 +123,7 @@
 		successElementClass: "is-valid"
   });
   $(document).ready(function(){
-    if ($('#icsImportControl')[0].files[0] != null){
+    if ($('#icsImportControl')[0] && $('#icsImportControl')[0].files[0] != null){
       var file = $('#icsImportControl')[0].files[0].name;
       $('#icsImportControl').next('label').html('<i class="far fa-file-alt"></i> ' + file);
     }
@@ -134,8 +184,58 @@
       }
     })
     $('#icsImportControl').change(function(){
-      var file = $('#icsImportControl')[0].files[0].name;
+      var file = $('#icsImportControl')[0] && $('#icsImportControl')[0].files[0].name;
       $(this).next('label').html('<i class="far fa-file-alt"></i> ' + file);
     });
+
+    {{#if oauth}}
+    $('#oauthLoginButton').click(function(){
+      window.location.href = `https://{{oauth.domain}}{{oauth.authorize_path}}?scope=read:accounts&response_type=code&redirect_uri={{oauth.redirect_uri}}&client_id={{oauth.client_id}}`;
+    });
+    function getUrlParameter(name) {
+      name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+      var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+      var results = regex.exec(location.search);
+      return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+    };
+
+    console.log('hi')
+    if (!localStorage.getItem('gathio-data')) {
+      localStorage.setItem('gathio-data','{}');
+    }
+    let {access_token, domain} = JSON.parse(localStorage.getItem('gathio-data'));
+    console.log(access_token, domain)
+
+    // if no access token in storage, no code in url
+    if (!getUrlParameter('code') && !access_token) {
+      $('#oauth-login').show();
+      $('#login-confirmed').hide();
+      $('#action-buttons').hide();
+    }
+    // if no access token in storage, code in url
+    // send the code parameter to the server to get an access token
+    // store the result in localStorage, reload the page
+    if (getUrlParameter('code') && !access_token) {
+      fetch(`https://{{domain}}/request-token/?code=${getUrlParameter('code')}`)
+        .then((resp) => resp.json())
+        .then(data => {
+          console.log('data', data);
+          localStorage.setItem('gathio-data',JSON.stringify(data));
+          // reload without url parameters
+          window.location.href = window.location.origin + window.location.pathname;
+        });
+    }
+    // if we have an access token, then we can render our login
+    if (JSON.parse(localStorage.getItem('gathio-data')).access_token) {
+      let {access_token, domain} = JSON.parse(localStorage.getItem('gathio-data'));
+
+      $('#oauth-login').hide();
+      $('#login-confirmed > .row').html(`<p>Welcome! You are logged in via your <strong>${domain}</strong> account.</p>`);
+      $('#login-confirmed').show();
+      $('#action-buttons').show();
+      console.log('HOORAY')
+    }
+    {{/if}}
+
   })
 	</script>
