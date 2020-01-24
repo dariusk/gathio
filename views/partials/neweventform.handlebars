@@ -1,6 +1,7 @@
 <h4 class="mb-2">Create an event</h4>
 <form id="newEventForm" action="/newevent" method="post" enctype="multipart/form-data">
  	<input type="text" hidden class="form-control" id="eventType" name="eventType" value="{{eventType}}">
+ 	<input type="text" hidden class="form-control access-token" id="accessToken" name="accessToken" value="">
   <div class="form-group row">
     <label for="eventName" class="col-sm-2 col-form-label">Event name</label>
     <div class="form-group col-sm-10">
@@ -153,6 +154,11 @@
 			label_selected: "Change file",
 			no_label: false
 		});
+    {{#if oauth}}
+    $('.access-token').each(function() {
+      $(this).attr('value',JSON.parse(localStorage.getItem('gathio-data')).access_token)
+    });
+    {{/if}}
 		autosize($('textarea'));
         $("#maxAttendeesCheckbox").on("click", function() {
             if ($(this).is(':checked')) {

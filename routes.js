@@ -23,6 +23,7 @@ const marked = require('marked');
 const generateRSAKeypair = require('generate-rsa-keypair');
 const crypto = require('crypto');
 const request = require('request');
+const cors = require('cors');
 
 const domain = require('./config/domain.js').domain;
 const contactEmail = require('./config/domain.js').email;
@@ -33,6 +34,7 @@ let isFederated = require('./config/domain.js').isFederated;
 if (isFederated === undefined) {
   isFederated = true;
 }
+const oauth = require('./config/domain.js').oauth;
 const ap = require('./activitypub.js');
 
 // Extra marked renderer (used to render plaintext event description for page metadata)
@@ -156,6 +158,57 @@ router.get('/new', (req, res) => {
 //	res.render('admin');
 //})
 
+// if oauth is enabled, this function checks to see if we've been sent an access token
+// otherwise we simply skip verification
+function isAuthenticated(req, res, next) {
+  if (oauth) {
+    request.get({
+      url: `https://${oauth.domain}${oauth.token_verification_path}`,
+      headers: {
+        'Authorization': `Bearer ${req.body.accessToken}`
+      },
+    }, (err, resp, body) => {
+      if (resp.statusCode === 200) {
+        return next();
+      }
+      else {
+        res.redirect('/');
+      }
+    });
+  }
+  else {
+    return next();
+  }
+}
+
+router.get('/request-token', cors(), (req, res) => {
+  if (!oauth) {
+    return res.status(501).json({message: `OAuth is not enabled on this server.`});
+  }
+  else if (!oauth.client_id || !oauth.client_secret || !oauth.redirect_uri) {
+    return res.status(501).json({message: `OAuth is misconfigured on this server. Please contact the admin at ${contactEmail} and let them know.`});
+  }
+  else if (!req.query.code) {
+    return res.status(400).json({message: `Request is missing the required 'code' parameter.`});
+  }
+
+  let params = req.query;
+  params.client_id = oauth.client_id;
+  params.client_secret = oauth.client_secret;
+  params.redirect_uri = oauth.redirect_uri;
+  params.grant_type = 'authorization_code';
+  request.post(`https://${oauth.domain}${oauth.token_path}`, {form: params}, (err,httpResponse,body) => {
+    body = JSON.parse(body);
+    if (body.access_token) {
+      return res.json({ access_token: body.access_token, domain: oauth.domain});
+    }
+    else {
+      return res.status(401).json(body);
+    }
+  });
+});
+
+
 //router.get('/login', (req, res) => {
 //	res.render('login');
 //});
@@ -171,6 +224,7 @@ router.get('/new/event', (req, res) => {
     siteName: siteName,
   });
 });
+
 router.get('/new/event/public', (req, res) => {
 	let isPrivate = false;
 	let isPublic = true;
@@ -199,6 +253,7 @@ router.get('/new/event/public', (req, res) => {
     domain: domain,
     email: contactEmail,
     siteName: siteName,
+    oauth: oauth,
 	});
 })
 
@@ -411,7 +466,8 @@ router.get('/:eventID', (req, res) => {
             eventHasConcluded: eventHasConcluded,
             eventHasBegun: eventHasBegun,
             metadata: metadata,
-            siteName: siteName
+            siteName: siteName,
+            oauth: oauth
           })
         }
 			}
@@ -551,7 +607,8 @@ router.get('/group/:eventGroupID', (req, res) => {
 					eventGroupHasCoverImage: eventGroupHasCoverImage,
 					eventGroupHasHost: eventGroupHasHost,
 					firstLoad: firstLoad,
-					metadata: metadata
+					metadata: metadata,
+          oauth: oauth
 				})
 			}
 			else {
@@ -614,7 +671,7 @@ router.get('/exportevent/:eventID', (req, res) => {
 //);
 
 
-router.post('/newevent', async (req, res) => {
+router.post('/newevent', isAuthenticated, async (req, res) => {
 	let eventID = shortid.generate();
   // this is a hack, activitypub does not like "-" in ids so we are essentially going
   // to have a 63-character alphabet instead of a 64-character one
@@ -706,7 +763,7 @@ router.post('/newevent', async (req, res) => {
 		.catch((err) => { res.status(500).send('Database error, please try again :( - ' + err); addToLog("createEvent", "error", "Attempt to create event failed with error: " + err);});
 });
 
-router.post('/importevent', (req, res) => {
+router.post('/importevent', isAuthenticated, (req, res) => {
 	let eventID = shortid.generate();
 	let editToken = randomstring.generate();
 	if (req.files && Object.keys(req.files).length !== 0) {
@@ -777,7 +834,7 @@ router.post('/importevent', (req, res) => {
 	}
 });
 
-router.post('/neweventgroup', (req, res) => {
+router.post('/neweventgroup', isAuthenticated, (req, res) => {
 	let eventGroupID = shortid.generate();
 	let editToken = randomstring.generate();
 	let eventGroupImageFilename = "";
