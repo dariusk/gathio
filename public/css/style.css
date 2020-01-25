@@ -363,3 +363,7 @@ body, html {
 	font-family: 'Courier New', Courier, monospace;
 	overflow-wrap: anywhere;
 }
+
+#oauth-notice {
+  font-size: 0.7rem;
+}

@@ -147,6 +147,7 @@ router.get('/', (req, res) => {
     domain: domain,
     email: contactEmail,
     siteName: siteName,
+    oauth: oauth,
   });
 });
 

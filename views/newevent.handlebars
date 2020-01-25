@@ -199,12 +199,10 @@
       return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
     };
 
-    console.log('hi')
     if (!localStorage.getItem('gathio-data')) {
       localStorage.setItem('gathio-data','{}');
     }
     let {access_token, domain} = JSON.parse(localStorage.getItem('gathio-data'));
-    console.log(access_token, domain)
 
     // if no access token in storage, no code in url
     if (!getUrlParameter('code') && !access_token) {
@@ -219,7 +217,6 @@
       fetch(`https://{{domain}}/request-token/?code=${getUrlParameter('code')}`)
         .then((resp) => resp.json())
         .then(data => {
-          console.log('data', data);
           localStorage.setItem('gathio-data',JSON.stringify(data));
           // reload without url parameters
           window.location.href = window.location.origin + window.location.pathname;
@@ -233,7 +230,6 @@
       $('#login-confirmed > .row').html(`<p>Welcome! You are logged in via your <strong>${domain}</strong> account.</p>`);
       $('#login-confirmed').show();
       $('#action-buttons').show();
-      console.log('HOORAY')
     }
     {{/if}}
 

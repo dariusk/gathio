@@ -73,5 +73,19 @@
 				</div>
 			</div>
 		</div>
+    <script>
+      {{#if oauth}}
+      let gathioData = JSON.parse(localStorage.getItem('gathio-data'));
+      if (gathioData && gathioData.access_token) {
+        let {access_token, domain} = JSON.parse(localStorage.getItem('gathio-data'));
+        document.getElementById('oauth-notice').innerHTML = `You are logged in with your ${domain} account. <a href="#" onclick="logOut()">Click here</a> to log out.`;
+      }
+
+      function logOut() {
+        localStorage.removeItem('gathio-data');
+        window.location = window.location;
+      }
+      {{/if}}
+    </script>
 	</body>
 </html>
